@@ -1,0 +1,1 @@
+// 此文件已不再需要，功能已整合到 SystemAnalysisApp.tsx 中

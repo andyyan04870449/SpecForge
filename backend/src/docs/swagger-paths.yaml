@@ -1,0 +1,664 @@
+# Project APIs
+/projects:
+  get:
+    tags:
+      - Projects
+    summary: 取得專案列表
+    description: 查詢所有專案，支援分頁和過濾
+    parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 20
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [active, archived, draft]
+    responses:
+      200:
+        description: 成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Project'
+                meta:
+                  $ref: '#/components/schemas/PaginationMeta'
+  post:
+    tags:
+      - Projects
+    summary: 建立新專案
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              status:
+                type: string
+                enum: [active, archived, draft]
+    responses:
+      201:
+        description: 建立成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                data:
+                  $ref: '#/components/schemas/Project'
+
+/projects/{projectId}:
+  get:
+    tags:
+      - Projects
+    summary: 取得專案詳情
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+      404:
+        $ref: '#/components/responses/NotFound'
+  put:
+    tags:
+      - Projects
+    summary: 更新專案
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              status:
+                type: string
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - Projects
+    summary: 刪除專案
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      204:
+        description: 刪除成功
+
+# Module APIs
+/projects/{projectId}/modules:
+  get:
+    tags:
+      - Modules
+    summary: 取得模組列表
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+  post:
+    tags:
+      - Modules
+    summary: 建立新模組
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      201:
+        description: 建立成功
+
+/projects/{projectId}/modules/tree:
+  get:
+    tags:
+      - Modules
+    summary: 取得模組樹狀結構
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+
+/modules/{moduleId}:
+  get:
+    tags:
+      - Modules
+    summary: 取得模組詳情
+    parameters:
+      - $ref: '#/components/parameters/moduleId'
+    responses:
+      200:
+        description: 成功
+  put:
+    tags:
+      - Modules
+    summary: 更新模組
+    parameters:
+      - $ref: '#/components/parameters/moduleId'
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - Modules
+    summary: 刪除模組
+    parameters:
+      - $ref: '#/components/parameters/moduleId'
+    responses:
+      204:
+        description: 刪除成功
+
+# UseCase APIs
+/modules/{moduleId}/use-cases:
+  get:
+    tags:
+      - UseCases
+    summary: 取得用例列表
+    parameters:
+      - $ref: '#/components/parameters/moduleId'
+    responses:
+      200:
+        description: 成功
+  post:
+    tags:
+      - UseCases
+    summary: 建立新用例
+    parameters:
+      - $ref: '#/components/parameters/moduleId'
+    responses:
+      201:
+        description: 建立成功
+
+/use-cases/{useCaseId}:
+  get:
+    tags:
+      - UseCases
+    summary: 取得用例詳情
+    parameters:
+      - $ref: '#/components/parameters/useCaseId'
+    responses:
+      200:
+        description: 成功
+  put:
+    tags:
+      - UseCases
+    summary: 更新用例
+    parameters:
+      - $ref: '#/components/parameters/useCaseId'
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - UseCases
+    summary: 刪除用例
+    parameters:
+      - $ref: '#/components/parameters/useCaseId'
+    responses:
+      204:
+        description: 刪除成功
+
+# Sequence APIs
+/use-cases/{useCaseId}/sequences:
+  get:
+    tags:
+      - Sequences
+    summary: 取得序列圖列表
+    parameters:
+      - $ref: '#/components/parameters/useCaseId'
+    responses:
+      200:
+        description: 成功
+  post:
+    tags:
+      - Sequences
+    summary: 建立新序列圖
+    parameters:
+      - $ref: '#/components/parameters/useCaseId'
+    responses:
+      201:
+        description: 建立成功
+
+/sequences/{sequenceId}:
+  get:
+    tags:
+      - Sequences
+    summary: 取得序列圖詳情
+    parameters:
+      - $ref: '#/components/parameters/sequenceId'
+    responses:
+      200:
+        description: 成功
+  put:
+    tags:
+      - Sequences
+    summary: 更新序列圖
+    parameters:
+      - $ref: '#/components/parameters/sequenceId'
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - Sequences
+    summary: 刪除序列圖
+    parameters:
+      - $ref: '#/components/parameters/sequenceId'
+    responses:
+      204:
+        description: 刪除成功
+
+# API Contract APIs
+/projects/{projectId}/apis:
+  get:
+    tags:
+      - APIs
+    summary: 取得 API 列表
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+  post:
+    tags:
+      - APIs
+    summary: 建立新 API
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      201:
+        description: 建立成功
+
+/apis/{apiId}:
+  get:
+    tags:
+      - APIs
+    summary: 取得 API 詳情
+    parameters:
+      - $ref: '#/components/parameters/apiId'
+    responses:
+      200:
+        description: 成功
+  put:
+    tags:
+      - APIs
+    summary: 更新 API
+    parameters:
+      - $ref: '#/components/parameters/apiId'
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - APIs
+    summary: 刪除 API
+    parameters:
+      - $ref: '#/components/parameters/apiId'
+    responses:
+      204:
+        description: 刪除成功
+
+# DTO APIs
+/projects/{projectId}/dtos:
+  get:
+    tags:
+      - DTOs
+    summary: 取得 DTO 列表
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+  post:
+    tags:
+      - DTOs
+    summary: 建立新 DTO
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      201:
+        description: 建立成功
+
+/dtos/{dtoId}:
+  get:
+    tags:
+      - DTOs
+    summary: 取得 DTO 詳情
+    parameters:
+      - $ref: '#/components/parameters/dtoId'
+    responses:
+      200:
+        description: 成功
+  put:
+    tags:
+      - DTOs
+    summary: 更新 DTO
+    parameters:
+      - $ref: '#/components/parameters/dtoId'
+    responses:
+      200:
+        description: 更新成功
+  delete:
+    tags:
+      - DTOs
+    summary: 刪除 DTO
+    parameters:
+      - $ref: '#/components/parameters/dtoId'
+    responses:
+      204:
+        description: 刪除成功
+
+# Statistics API
+/statistics/{projectId}:
+  get:
+    tags:
+      - Statistics
+    summary: 取得專案統計資訊
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+      - name: simple
+        in: query
+        schema:
+          type: boolean
+        description: 是否返回簡易統計
+    responses:
+      200:
+        description: 成功
+
+# AI APIs
+/ai/generate:
+  post:
+    tags:
+      - AI
+    summary: 生成 AI 內容
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - type
+            properties:
+              type:
+                type: string
+                enum: [sequence, api, dto]
+              projectId:
+                type: string
+    responses:
+      200:
+        description: 生成成功
+
+/ai/drafts/{draftId}:
+  get:
+    tags:
+      - AI
+    summary: 取得 AI 草稿
+    parameters:
+      - name: draftId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      200:
+        description: 成功
+  delete:
+    tags:
+      - AI
+    summary: 刪除 AI 草稿
+    parameters:
+      - name: draftId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      204:
+        description: 刪除成功
+
+/ai/adopt-draft:
+  post:
+    tags:
+      - AI
+    summary: 採用 AI 草稿
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - draftId
+            properties:
+              draftId:
+                type: string
+    responses:
+      201:
+        description: 採用成功
+
+# Catalog APIs
+/catalog:
+  get:
+    tags:
+      - Catalog
+    summary: 取得完整目錄
+    responses:
+      200:
+        description: 成功
+
+/catalog/modules:
+  get:
+    tags:
+      - Catalog
+    summary: 取得模組目錄
+    responses:
+      200:
+        description: 成功
+
+/catalog/apis:
+  get:
+    tags:
+      - Catalog
+    summary: 取得 API 目錄
+    responses:
+      200:
+        description: 成功
+
+/catalog/dtos:
+  get:
+    tags:
+      - Catalog
+    summary: 取得 DTO 目錄
+    responses:
+      200:
+        description: 成功
+
+# Search API
+/search:
+  get:
+    tags:
+      - Search
+    summary: 全文搜尋
+    parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+        description: 搜尋關鍵字
+      - name: type
+        in: query
+        schema:
+          type: string
+          enum: [all, project, module, useCase, sequence, api, dto]
+      - name: projectId
+        in: query
+        schema:
+          type: string
+    responses:
+      200:
+        description: 成功
+
+# Consistency API
+/consistency/check:
+  post:
+    tags:
+      - Consistency
+    summary: 執行一致性檢查
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - projectId
+            properties:
+              projectId:
+                type: string
+    responses:
+      200:
+        description: 檢查完成
+
+/consistency/report/{projectId}:
+  get:
+    tags:
+      - Consistency
+    summary: 取得一致性檢查報告
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 成功
+
+# Export/Import APIs
+/export/project/{projectId}:
+  post:
+    tags:
+      - Export/Import
+    summary: 匯出專案資料
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              format:
+                type: string
+                enum: [json, yaml]
+    responses:
+      200:
+        description: 匯出成功
+
+/export/project/{projectId}/openapi:
+  get:
+    tags:
+      - Export/Import
+    summary: 匯出 OpenAPI 規格
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 匯出成功
+
+/export/project/{projectId}/markdown:
+  get:
+    tags:
+      - Export/Import
+    summary: 匯出 Markdown 文檔
+    parameters:
+      - $ref: '#/components/parameters/projectId'
+    responses:
+      200:
+        description: 匯出成功
+
+/import/project:
+  post:
+    tags:
+      - Export/Import
+    summary: 匯入專案資料
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+    responses:
+      201:
+        description: 匯入成功
+
+# Health Check APIs
+/health:
+  get:
+    tags:
+      - Health
+    summary: 基本健康檢查
+    responses:
+      200:
+        description: 服務正常
+
+/health/ready:
+  get:
+    tags:
+      - Health
+    summary: 就緒狀態檢查
+    responses:
+      200:
+        description: 服務就緒
+
+/health/live:
+  get:
+    tags:
+      - Health
+    summary: 存活狀態檢查
+    responses:
+      200:
+        description: 服務存活
+
+/health/db:
+  get:
+    tags:
+      - Health
+    summary: 資料庫連線狀態
+    responses:
+      200:
+        description: 資料庫正常
+
+/health/detailed:
+  get:
+    tags:
+      - Health
+    summary: 詳細系統狀態
+    responses:
+      200:
+        description: 詳細狀態資訊

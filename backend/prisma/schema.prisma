@@ -1,0 +1,295 @@
+// Prisma schema for SpecForge
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 流水號計數器表
+model SeqCounter {
+  id         BigInt   @id @default(autoincrement())
+  projectId  String   @map("project_id")
+  scopeType  String   @map("scope_type") // MODULE | USE_CASE | SEQUENCE | API | DTO
+  scopeRef1  String?  @map("scope_ref1") // module_id / use_case_id / domain / dto_name_base
+  scopeRef2  String?  @map("scope_ref2") // 保留欄位
+  nextNumber BigInt   @default(1) @map("next_number")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, scopeType, scopeRef1, scopeRef2])
+  @@index([projectId])
+  @@index([scopeType, scopeRef1])
+  @@map("seq_counter")
+}
+
+// 使用者
+model User {
+  id                      String         @id @default(uuid())
+  email                   String         @unique
+  password                String
+  name                    String?
+  role                    String         @default("user") // user | admin | super_admin
+  isActive                Boolean        @default(true) @map("is_active")
+  isLocked                Boolean        @default(false) @map("is_locked")
+  lockReason              String?        @map("lock_reason")
+  failedLoginAttempts     Int            @default(0) @map("failed_login_attempts")
+  lastLoginAt             DateTime?      @map("last_login_at")
+  lastPasswordChange      DateTime?      @map("last_password_change")
+  emailVerified           Boolean        @default(false) @map("email_verified")
+  emailVerificationToken  String?        @map("email_verification_token")
+  passwordResetToken      String?        @map("password_reset_token")
+  passwordResetExpires    DateTime?      @map("password_reset_expires")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  // 關聯
+  projects       Project[]       @relation("ProjectOwner")
+  refreshTokens  RefreshToken[]
+  projectMembers ProjectMember[] @relation("ProjectMember")
+  invitedMembers ProjectMember[] @relation("ProjectInviter")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@index([isLocked])
+  @@map("user")
+}
+
+// Refresh Token 管理
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  token       String    @unique
+  deviceInfo  String?   @map("device_info")
+  ipAddress   String?   @map("ip_address")
+  expiresAt   DateTime  @map("expires_at")
+  isRevoked   Boolean   @default(false) @map("is_revoked")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // 關聯
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@index([isRevoked])
+  @@map("refresh_token")
+}
+
+// 專案
+model Project {
+  id          String   @id @default(uuid())
+  projectCode String   @unique @map("project_code")
+  name        String
+  description String?
+  version     String?
+  status      String   @default("PLANNING") // PLANNING | IN_PROGRESS | REVIEW | COMPLETED
+  ownerId     String?  @map("owner_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner            User?             @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members          ProjectMember[]
+  modules          Module[]
+  apis             ApiContract[]
+  dtos             DtoSchema[]
+  useCases         UseCase[]
+  sequenceDiagrams SequenceDiagram[]
+
+  @@index([name])
+  @@index([projectCode])
+  @@index([status])
+  @@index([ownerId])
+  @@map("project")
+}
+
+// 專案成員權限
+model ProjectMember {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  userId      String    @map("user_id")
+  role        String    // OWNER | EDITOR | VIEWER
+  permissions Json?     @default("{}")
+  invitedBy   String?   @map("invited_by")
+  invitedAt   DateTime  @default(now()) @map("invited_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation("ProjectMember", fields: [userId], references: [id], onDelete: Cascade)
+  inviter   User?   @relation("ProjectInviter", fields: [invitedBy], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([projectId, role])
+  @@map("project_member")
+}
+
+// 模組
+model Module {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  modCode     String   @map("mod_code") // MOD-xxx
+  title       String
+  description String?
+  parentId    String?  @map("parent_id")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Module?   @relation("ModuleHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Module[]  @relation("ModuleHierarchy")
+  useCases     UseCase[]
+
+  @@unique([projectId, modCode])
+  @@index([projectId])
+  @@index([parentId])
+  @@index([projectId, order])
+  @@map("module")
+}
+
+// 使用案例
+model UseCase {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  moduleId  String   @map("module_id")
+  ucCode    String   @map("uc_code") // UC-xxx
+  title     String
+  summary   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  module           Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  sequenceDiagrams SequenceDiagram[]
+
+  @@unique([projectId, ucCode])
+  @@index([projectId])
+  @@index([moduleId])
+  @@map("use_case")
+}
+
+// 循序圖
+model SequenceDiagram {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  useCaseId   String   @map("use_case_id")
+  sdCode      String   @map("sd_code") // SD-xxx
+  title       String
+  mermaidSrc  String   @map("mermaid_src") @db.Text
+  parseStatus String   @default("pending") @map("parse_status") // pending | success | error
+  parseError  String?  @map("parse_error") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  useCase            UseCase             @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  apiSequenceLinks   ApiSequenceLink[]
+
+  @@unique([projectId, sdCode])
+  @@index([projectId])
+  @@index([useCaseId])
+  @@map("sequence_diagram")
+}
+
+// API 合約
+model ApiContract {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  apiCode      String   @map("api_code") // API-xxx-xxx
+  method       String   // GET | POST | PUT | DELETE | PATCH
+  endpoint     String
+  title        String
+  description  String?  @db.Text
+  domain       String   @default("GEN") // AUTH | USER | ORDER | GEN
+  requestSpec  Json?    @map("request_spec")
+  responseSpec Json?    @map("response_spec")
+  headers      Json?
+  queryParams  Json?    @map("query_params")
+  pathParams   Json?    @map("path_params")
+  statusCodes  Json?    @map("status_codes")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiSequenceLinks ApiSequenceLink[]
+  apiDtoLinks      ApiDtoLink[]
+
+  @@unique([projectId, apiCode])
+  @@unique([projectId, method, endpoint])
+  @@index([projectId])
+  @@index([projectId, method, endpoint])
+  @@map("api_contract")
+}
+
+// DTO Schema
+model DtoSchema {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  dtoCode    String   @map("dto_code") // DTO-xxx-xxx
+  title      String
+  schemaJson Json     @map("schema_json") @db.JsonB
+  kind       String   // request | response
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiDtoLinks ApiDtoLink[]
+
+  @@unique([projectId, dtoCode])
+  @@index([projectId])
+  @@index([projectId, kind])
+  @@map("dto_schema")
+}
+
+// API-Sequence 關聯
+model ApiSequenceLink {
+  id         String   @id @default(uuid())
+  apiId      String   @map("api_id")
+  sequenceId String   @map("sequence_id")
+  stepRef    String?  @map("step_ref") @db.Text
+  lineNumber Int?     @map("line_number")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  api      ApiContract     @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  sequence SequenceDiagram @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([apiId, sequenceId, stepRef])
+  @@index([apiId])
+  @@index([sequenceId])
+  @@map("api_sequence_link")
+}
+
+// API-DTO 關聯
+model ApiDtoLink {
+  id        String   @id @default(uuid())
+  apiId     String   @map("api_id")
+  dtoId     String   @map("dto_id")
+  role      String   // req | res
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  api ApiContract @relation(fields: [apiId], references: [id], onDelete: Cascade)
+  dto DtoSchema   @relation(fields: [dtoId], references: [id], onDelete: Cascade)
+
+  @@unique([apiId, dtoId, role])
+  @@index([apiId])
+  @@index([dtoId])
+  @@map("api_dto_link")
+}
