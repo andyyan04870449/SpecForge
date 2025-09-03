@@ -38,7 +38,9 @@ import {
   ProjectOutlined,
   ReloadOutlined,
   ArrowLeftOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  BulbOutlined,
+  CheckOutlined
 } from '@ant-design/icons';
 import MermaidRenderer from '../components/MermaidRenderer';
 import api, { Project, Module, UseCase, SequenceDiagram, APIContract, DTOSchema } from '@/services/api';
@@ -56,10 +58,16 @@ interface NodeData {
   label: string;
   dbId?: string; // 資料庫ID
   parentId?: string; // 父節點資料庫ID
+  // AI 預覽相關
+  isPreview?: boolean;  // 是否在預覽模式
+  isDimmed?: boolean;   // 是否壓暗
+  hasChanges?: boolean; // 是否有建議的變更
+  suggestionId?: string; // 對應的建議 ID
+  previewData?: any;    // 預覽的資料
 }
 
 // 自定義節點組件
-const CustomNode: React.FC<{ data: NodeData }> = ({ data }) => {
+const CustomNode: React.FC<{ data: NodeData; id: string }> = ({ data, id }) => {
   const nodeTypeColors = {
     MODULE: '#1890ff',
     USE_CASE: '#52c41a', 
@@ -68,20 +76,97 @@ const CustomNode: React.FC<{ data: NodeData }> = ({ data }) => {
     DTO: '#eb2f96'
   };
 
+  // 決定節點的顯示狀態
+  const getNodeStyle = () => {
+    const baseStyle: any = {
+      borderColor: nodeTypeColors[data.type],
+      position: 'relative'
+    };
+
+    if (data.isDimmed) {
+      baseStyle.opacity = 0.3;
+      baseStyle.filter = 'grayscale(100%)';
+    } else if (data.hasChanges) {
+      baseStyle.borderWidth = '3px';
+      baseStyle.borderColor = '#52c41a';
+      baseStyle.boxShadow = '0 0 10px rgba(82, 196, 26, 0.5)';
+    } else if (data.isPreview) {
+      baseStyle.borderStyle = 'dashed';
+      baseStyle.borderWidth = '2px';
+      baseStyle.borderColor = '#1890ff';
+    }
+
+    return baseStyle;
+  };
+
+  // 處理接受/拒絕建議
+  const handleAcceptSuggestion = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // 這裡會通過父組件的回調處理
+    const event = new CustomEvent('acceptSuggestion', { detail: { nodeId: id, suggestionId: data.suggestionId } });
+    window.dispatchEvent(event);
+  };
+
+  const handleRejectSuggestion = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const event = new CustomEvent('rejectSuggestion', { detail: { nodeId: id, suggestionId: data.suggestionId } });
+    window.dispatchEvent(event);
+  };
+
   return (
     <div 
       className="custom-node" 
-      style={{ borderColor: nodeTypeColors[data.type] }}
+      style={getNodeStyle()}
     >
       <Handle type="target" position={Position.Left} />
+      
+      {/* 顯示接受/拒絕按鈕 */}
+      {data.hasChanges && (
+        <div style={{
+          position: 'absolute',
+          top: '-30px',
+          right: '0',
+          display: 'flex',
+          gap: '5px',
+          zIndex: 10
+        }}>
+          <Button
+            size="small"
+            type="primary"
+            shape="circle"
+            icon={<CheckOutlined />}
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+            onClick={handleAcceptSuggestion}
+          />
+          <Button
+            size="small"
+            danger
+            shape="circle"
+            icon={<CloseOutlined />}
+            onClick={handleRejectSuggestion}
+          />
+        </div>
+      )}
+      
       <div className="node-header">
         <Tag color={nodeTypeColors[data.type]} style={{ margin: 0 }}>
           {data.type.replace('_', ' ')}
         </Tag>
+        {data.isPreview && <Tag color="blue">預覽</Tag>}
       </div>
       <div className="node-content">
-        <strong>{data.code}</strong>
-        <div className="node-title">{data.label}</div>
+        <strong>{data.previewData?.code || data.code}</strong>
+        <div className="node-title">{data.previewData?.label || data.label}</div>
+        {data.hasChanges && data.previewData?.description && (
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#52c41a',
+            marginTop: '5px',
+            fontStyle: 'italic'
+          }}>
+            建議: {data.previewData.description}
+          </div>
+        )}
       </div>
       <Handle type="source" position={Position.Right} />
     </div>
@@ -106,6 +191,24 @@ interface ChatMessage {
   type: 'user' | 'ai';
   content: string;
   timestamp: Date;
+}
+
+// AI 建議相關類型
+interface AISuggestion {
+  nodeId?: string;  // 如果是修改現有節點
+  tempId?: string;  // 如果是新增節點的臨時 ID
+  action: 'create' | 'update' | 'delete';
+  type?: string;    // 節點類型
+  data?: any;       // 建議的資料內容
+  parentId?: string;  // 父節點 ID（新增時使用）
+  accepted?: boolean; // 是否接受此建議
+}
+
+interface AIPreviewMode {
+  enabled: boolean;
+  suggestions: AISuggestion[];
+  originalNodes: Node[];
+  originalEdges: Edge[];
 }
 
 // 缺失功能記錄
@@ -185,6 +288,14 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       timestamp: new Date()
     }
   ]);
+  
+  // AI 建議預覽模式
+  const [aiPreviewMode, setAiPreviewMode] = useState<AIPreviewMode>({
+    enabled: false,
+    suggestions: [],
+    originalNodes: [],
+    originalEdges: []
+  });
   const [userInput, setUserInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -261,8 +372,10 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       const modules = modulesResponse.success ? modulesResponse.data : [];
       
       modules.forEach((module: any, index) => {
+        // 使用統一的ID格式
+        const nodeId = `mod_${module.id.replace(/-/g, '_')}`;
         const node = {
-          id: `MOD-${module.id}`,
+          id: nodeId,
           type: 'custom',
           position: { x: 50, y: 100 + index * 150 },
           data: {
@@ -275,6 +388,18 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
         };
         console.log('創建模組節點:', node);
         newNodes.push(node);
+        
+        // 如果有父模組，創建連線
+        if (module.parentId) {
+          const parentNodeId = `mod_${module.parentId.replace(/-/g, '_')}`;
+          const edge = {
+            id: `e_parent_${module.id.replace(/-/g, '_')}`,
+            source: parentNodeId,
+            target: nodeId
+          };
+          console.log('創建邊 (父模組->子模組):', edge);
+          newEdges.push(edge);
+        }
       });
 
       // 載入使用案例
@@ -283,7 +408,8 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       const useCases = useCasesResponse.success ? useCasesResponse.data : [];
       
       useCases.forEach((uc: any, index) => {
-        const nodeId = `UC-${uc.id}`;
+        // 使用統一的ID格式
+        const nodeId = `uc_${uc.id.replace(/-/g, '_')}`;
         const node = {
           id: nodeId,
           type: 'custom',
@@ -301,12 +427,15 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
         
         // 創建模組到使用案例的連線
         if ((uc as any).moduleId) {
-          newEdges.push({
-            id: `e-mod-uc-${uc.id}`,
-            source: `MOD-${(uc as any).moduleId}`,
+          const sourceId = `mod_${(uc as any).moduleId.replace(/-/g, '_')}`;
+          const edge = {
+            id: `e_mod_uc_${uc.id.replace(/-/g, '_')}`,
+            source: sourceId,
             target: nodeId,
             animated: true
-          });
+          };
+          console.log('創建邊 (模組->使用案例):', edge);
+          newEdges.push(edge);
         }
       });
 
@@ -318,6 +447,7 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       sequences.forEach((seq: any, index) => {
         // 使用更簡單的ID格式，避免特殊字符
         const nodeId = `sd_${seq.id.replace(/-/g, '_')}`;
+        console.log(`創建 SD 節點: ${nodeId} (原始ID: ${seq.id})`);
         newNodes.push({
           id: nodeId,
           type: 'custom',
@@ -351,6 +481,7 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       apis.forEach((api: any, index) => {
         // 使用更簡單的ID格式，避免特殊字符
         const nodeId = `api_${api.id.replace(/-/g, '_')}`;
+        console.log(`創建 API 節點: ${nodeId} (原始ID: ${api.id})`);
         newNodes.push({
           id: nodeId,
           type: 'custom',
@@ -370,8 +501,11 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       const dtos = dtosResponse.success ? dtosResponse.data : [];
       
       dtos.forEach((dto, index) => {
+        // 使用統一的ID格式
+        const nodeId = `dto_${dto.id.replace(/-/g, '_')}`;
+        console.log(`創建 DTO 節點: ${nodeId} (原始ID: ${dto.id})`);
         newNodes.push({
-          id: `DTO-${dto.id}`,
+          id: nodeId,
           type: 'custom',
           position: { x: 850, y: 10 + index * 70 },
           data: {
@@ -384,8 +518,107 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
         });
       });
 
-      // TODO: 載入API-Sequence和API-DTO關聯（需要後端提供關聯查詢API）
-      // 目前這部分API尚未完全實現，先記錄為缺失功能
+      // 載入 API-Sequence 關聯
+      try {
+        console.log('載入 API-Sequence 關聯...');
+        console.log('當前專案 ID:', projectId);
+        
+        // 列出所有節點的 dbId 供對比
+        console.log('=== 所有節點的資料庫 ID ===');
+        console.log('SD 節點 dbIds:', newNodes.filter(n => n.data.type === 'SEQUENCE').map(n => ({ nodeId: n.id, dbId: n.data.dbId })));
+        console.log('API 節點 dbIds:', newNodes.filter(n => n.data.type === 'API').map(n => ({ nodeId: n.id, dbId: n.data.dbId })));
+        console.log('DTO 節點 dbIds:', newNodes.filter(n => n.data.type === 'DTO').map(n => ({ nodeId: n.id, dbId: n.data.dbId })));
+        
+        // 只獲取當前專案的關聯
+        const apiSeqLinksResponse = await api.getApiSequenceLinks({ projectId });
+        const apiSeqLinks = apiSeqLinksResponse.success ? apiSeqLinksResponse.data : [];
+        
+        console.log('API-Sequence 關聯資料 (專案篩選後):', apiSeqLinks);
+        
+        apiSeqLinks.forEach((link: any, index) => {
+          console.log('處理 API-Sequence 關聯:', link);
+          
+          const sourceId = `sd_${link.sequenceId.replace(/-/g, '_')}`;
+          const targetId = `api_${link.apiId.replace(/-/g, '_')}`;
+          
+          console.log(`嘗試連線: ${sourceId} -> ${targetId}`);
+          
+          // 檢查節點是否存在
+          const sourceNode = newNodes.find(n => n.id === sourceId);
+          const targetNode = newNodes.find(n => n.id === targetId);
+          
+          if (!sourceNode) {
+            console.warn(`❌ SD 節點不存在: ${sourceId}`);
+            console.log('現有 SD 節點:', newNodes.filter(n => n.data.type === 'SEQUENCE').map(n => n.id));
+          }
+          if (!targetNode) {
+            console.warn(`❌ API 節點不存在: ${targetId}`);
+            console.log('現有 API 節點:', newNodes.filter(n => n.data.type === 'API').map(n => n.id));
+          }
+          
+          if (sourceNode && targetNode) {
+            const edge = {
+              id: `e_sd_api_${index}`,
+              source: sourceId,
+              target: targetId,
+              type: 'smoothstep',
+              animated: false,
+              style: { stroke: '#fa8c16', strokeDasharray: '5 5' }
+            };
+            console.log('✅ 成功創建邊 (SD->API):', edge);
+            newEdges.push(edge);
+          }
+        });
+      } catch (error) {
+        console.error('載入 API-Sequence 關聯失敗:', error);
+      }
+      
+      // 載入 API-DTO 關聯
+      try {
+        console.log('載入 API-DTO 關聯...');
+        // 只獲取當前專案的關聯
+        const apiDtoLinksResponse = await api.getApiDtoLinks({ projectId });
+        const apiDtoLinks = apiDtoLinksResponse.success ? apiDtoLinksResponse.data : [];
+        
+        console.log('API-DTO 關聯資料 (專案篩選後):', apiDtoLinks);
+        
+        apiDtoLinks.forEach((link: any, index) => {
+          console.log('處理 API-DTO 關聯:', link);
+          
+          const sourceId = `api_${link.apiId.replace(/-/g, '_')}`;
+          const targetId = `dto_${link.dtoId.replace(/-/g, '_')}`;
+          
+          console.log(`嘗試連線: ${sourceId} -> ${targetId}`);
+          
+          // 檢查節點是否存在
+          const sourceNode = newNodes.find(n => n.id === sourceId);
+          const targetNode = newNodes.find(n => n.id === targetId);
+          
+          if (!sourceNode) {
+            console.warn(`❌ API 節點不存在: ${sourceId}`);
+            console.log('現有 API 節點:', newNodes.filter(n => n.data.type === 'API').map(n => n.id));
+          }
+          if (!targetNode) {
+            console.warn(`❌ DTO 節點不存在: ${targetId}`);
+            console.log('現有 DTO 節點:', newNodes.filter(n => n.data.type === 'DTO').map(n => n.id));
+          }
+          
+          if (sourceNode && targetNode) {
+            const edge = {
+              id: `e_api_dto_${index}`,
+              source: sourceId,
+              target: targetId,
+              type: 'smoothstep',
+              animated: false,
+              style: { stroke: '#eb2f96', strokeDasharray: '5 5' }
+            };
+            console.log('✅ 成功創建邊 (API->DTO):', edge);
+            newEdges.push(edge);
+          }
+        });
+      } catch (error) {
+        console.error('載入 API-DTO 關聯失敗:', error);
+      }
 
       // 如果沒有數據，添加一些測試節點
       if (newNodes.length === 0) {
@@ -437,8 +670,23 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
         });
       }
       
-      console.log('設定節點:', newNodes);
-      console.log('設定連線:', newEdges);
+      console.log('===== 載入結果統計 =====');
+      console.log('節點總數:', newNodes.length);
+      console.log('連線總數:', newEdges.length);
+      console.log('節點詳情:', newNodes);
+      console.log('連線詳情:', newEdges);
+      
+      // 驗證連線的源和目標是否存在
+      const nodeIds = new Set(newNodes.map(n => n.id));
+      newEdges.forEach(edge => {
+        if (!nodeIds.has(edge.source)) {
+          console.warn(`❌ 連線 ${edge.id} 的源節點 ${edge.source} 不存在！`);
+        }
+        if (!nodeIds.has(edge.target)) {
+          console.warn(`❌ 連線 ${edge.id} 的目標節點 ${edge.target} 不存在！`);
+        }
+      });
+      
       setNodes(newNodes);
       setEdges(newEdges);
       
@@ -579,9 +827,19 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
           break;
           
         case 'API':
+          // 如果沒有提供路徑，根據名稱生成一個預設路徑
+          let fullPath = values.path;
+          if (!fullPath) {
+            // 將名稱轉換為合適的路徑格式（轉小寫、空格變連字號）
+            const pathName = values.name
+              .toLowerCase()
+              .replace(/\s+/g, '-')
+              .replace(/[^a-z0-9-]/g, '');
+            fullPath = `/api/${pathName || 'resource-' + Date.now()}`;
+          }
+          
           // 解析路徑來取得 domain 和 endpoint
-          const fullPath = values.path || '/api/resource';
-          const pathParts = fullPath.split('/').filter(p => p);
+          const pathParts = fullPath.split('/').filter((p: string) => p);
           const domain = pathParts[0] || 'api';
           const endpoint = '/' + pathParts.join('/');
           
@@ -597,6 +855,21 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
           if (apiResponse.success && apiResponse.data) {
             newNodeData = apiResponse.data;
             newNodeId = `api_${newNodeData.id.replace(/-/g, '_')}`;
+            
+            // 如果是從 Sequence Diagram 創建的 API，建立關聯
+            if (parentNode?.data.type === 'SEQUENCE' && parentNode?.data.dbId) {
+              try {
+                await api.createApiSequenceLink({
+                  apiId: newNodeData.id,
+                  sequenceId: parentNode.data.dbId,
+                  description: `API created from sequence diagram: ${parentNode.data.label}`
+                });
+                console.log('成功建立 API-Sequence 關聯');
+              } catch (linkError) {
+                console.error('建立 API-Sequence 關聯失敗:', linkError);
+                // 不影響 API 建立，只記錄錯誤
+              }
+            }
           }
           break;
           
@@ -621,6 +894,22 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
           if (dtoResponse.success && dtoResponse.data) {
             newNodeData = dtoResponse.data;
             newNodeId = `dto_${newNodeData.id.replace(/-/g, '_')}`;
+            
+            // 如果是從 API 創建的 DTO，建立關聯
+            if (parentNode?.data.type === 'API' && parentNode?.data.dbId) {
+              try {
+                await api.createApiDtoLink({
+                  apiId: parentNode.data.dbId,
+                  dtoId: newNodeData.id,
+                  role: values.kind === 'response' ? 'res' : 'req',
+                  description: `DTO created from API: ${parentNode.data.label}`
+                });
+                console.log('成功建立 API-DTO 關聯');
+              } catch (linkError) {
+                console.error('建立 API-DTO 關聯失敗:', linkError);
+                // 不影響 DTO 建立，只記錄錯誤
+              }
+            }
           }
           break;
       }
@@ -669,7 +958,16 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       }
     } catch (error: any) {
       console.error('Failed to create node:', error);
-      message.error(error.response?.data?.error?.message || '創建失敗');
+      
+      // 提供更詳細的錯誤訊息
+      let errorMessage = '創建失敗';
+      if (error.response?.status === 409) {
+        errorMessage = '此 API 端點與方法的組合已存在，請使用不同的路徑或方法';
+      } else if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      }
+      
+      message.error(errorMessage);
     }
   };
 
@@ -828,6 +1126,180 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       message.error(error.response?.data?.error?.message || '保存失敗');
     }
   };
+
+  // 模擬 AI 建議功能
+  const simulateAISuggestions = () => {
+    // 保存當前狀態
+    const originalNodesCopy = [...nodes];
+    const originalEdgesCopy = [...edges];
+    
+    // 創建模擬建議
+    const suggestions: AISuggestion[] = [];
+    
+    // 模擬修改現有節點的建議
+    if (nodes.length > 0) {
+      const targetNode = nodes[0];
+      suggestions.push({
+        nodeId: targetNode.id,
+        action: 'update',
+        data: {
+          label: targetNode.data.label + ' (AI建議修改)',
+          description: '建議優化此模組的命名和結構'
+        }
+      });
+    }
+    
+    // 模擬新增節點的建議
+    suggestions.push({
+      tempId: 'temp_' + Date.now(),
+      action: 'create',
+      type: 'USE_CASE',
+      data: {
+        code: 'UC-NEW-001',
+        label: 'AI建議的新使用案例',
+        type: 'USE_CASE'
+      },
+      parentId: nodes[0]?.id
+    });
+    
+    // 應用預覽模式
+    const updatedNodes = nodes.map(node => {
+      const suggestion = suggestions.find(s => s.nodeId === node.id);
+      if (suggestion) {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            hasChanges: true,
+            suggestionId: suggestion.nodeId,
+            previewData: suggestion.data
+          }
+        };
+      } else {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isDimmed: true
+          }
+        };
+      }
+    });
+    
+    // 添加新建議的節點
+    suggestions.filter(s => s.action === 'create').forEach(suggestion => {
+      const newNode: Node = {
+        id: suggestion.tempId!,
+        type: 'custom',
+        position: { x: 400, y: 300 },
+        data: {
+          ...suggestion.data,
+          isPreview: true,
+          suggestionId: suggestion.tempId
+        }
+      };
+      updatedNodes.push(newNode);
+    });
+    
+    setNodes(updatedNodes);
+    
+    // 啟用預覽模式
+    setAiPreviewMode({
+      enabled: true,
+      suggestions,
+      originalNodes: originalNodesCopy,
+      originalEdges: originalEdgesCopy
+    });
+    
+    message.info('AI 建議預覽模式已啟用');
+  };
+  
+  // 接受所有建議
+  const acceptAllSuggestions = () => {
+    const updatedNodes = nodes.map(node => {
+      if (node.data.hasChanges && node.data.previewData) {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            label: node.data.previewData.label || node.data.label,
+            code: node.data.previewData.code || node.data.code,
+            hasChanges: false,
+            isDimmed: false,
+            isPreview: false,
+            previewData: undefined,
+            suggestionId: undefined
+          }
+        };
+      } else if (node.data.isPreview) {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isPreview: false,
+            suggestionId: undefined
+          }
+        };
+      } else {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isDimmed: false
+          }
+        };
+      }
+    });
+    
+    setNodes(updatedNodes);
+    setAiPreviewMode({
+      enabled: false,
+      suggestions: [],
+      originalNodes: [],
+      originalEdges: []
+    });
+    
+    message.success('已接受所有 AI 建議');
+  };
+  
+  // 拒絕所有建議
+  const rejectAllSuggestions = () => {
+    // 恢復原始狀態
+    setNodes(aiPreviewMode.originalNodes);
+    setEdges(aiPreviewMode.originalEdges);
+    
+    setAiPreviewMode({
+      enabled: false,
+      suggestions: [],
+      originalNodes: [],
+      originalEdges: []
+    });
+    
+    message.info('已拒絕所有 AI 建議');
+  };
+  
+  // 處理單個建議的接受/拒絕
+  useEffect(() => {
+    const handleAcceptSuggestion = (e: CustomEvent) => {
+      const { nodeId, suggestionId } = e.detail;
+      // 處理單個建議接受邏輯
+      console.log('Accept suggestion:', nodeId, suggestionId);
+    };
+    
+    const handleRejectSuggestion = (e: CustomEvent) => {
+      const { nodeId, suggestionId } = e.detail;
+      // 處理單個建議拒絕邏輯
+      console.log('Reject suggestion:', nodeId, suggestionId);
+    };
+    
+    window.addEventListener('acceptSuggestion', handleAcceptSuggestion as any);
+    window.addEventListener('rejectSuggestion', handleRejectSuggestion as any);
+    
+    return () => {
+      window.removeEventListener('acceptSuggestion', handleAcceptSuggestion as any);
+      window.removeEventListener('rejectSuggestion', handleRejectSuggestion as any);
+    };
+  }, [nodes, aiPreviewMode]);
 
   const handleSendMessage = () => {
     if (!userInput.trim()) return;
@@ -1063,6 +1535,14 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
             disabled={!currentProject || dataLoading}
           >
             重新載入
+          </Button>
+          <Button 
+            type="dashed"
+            icon={<BulbOutlined />}
+            onClick={simulateAISuggestions}
+            disabled={!currentProject || aiPreviewMode.enabled}
+          >
+            模擬 AI 建議
           </Button>
           <Button type="primary" onClick={() => {
             Modal.info({
@@ -1394,6 +1874,54 @@ const AIDesignCanvasV2: React.FC<AIDesignCanvasV2Props> = ({ projectId, user, on
       >
         {renderDetailContent()}
       </Drawer>
+      
+      {/* AI 建議預覽模式底部控制欄 */}
+      {aiPreviewMode.enabled && (
+        <div style={{
+          position: 'fixed',
+          bottom: 30,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#fff',
+          borderRadius: '8px',
+          padding: '12px 20px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          <div style={{ 
+            color: '#666', 
+            fontSize: '14px',
+            fontWeight: 500
+          }}>
+            <BulbOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+            共有 {aiPreviewMode.suggestions.length} 個建議變更
+          </div>
+          <div style={{
+            width: '1px',
+            height: '24px',
+            background: '#e8e8e8'
+          }} />
+          <Space size="middle">
+            <Button
+              type="primary"
+              icon={<CheckOutlined />}
+              onClick={acceptAllSuggestions}
+            >
+              全部接受
+            </Button>
+            <Button
+              danger
+              icon={<CloseOutlined />}
+              onClick={rejectAllSuggestions}
+            >
+              全部拒絕
+            </Button>
+          </Space>
+        </div>
+      )}
     </div>
   );
 };

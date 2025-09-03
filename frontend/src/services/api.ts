@@ -565,6 +565,40 @@ class ApiService {
   async deleteModule(moduleId: string): Promise<void> {
     await this.axios.delete(`/modules/${moduleId}`);
   }
+
+  // API-Sequence 關聯
+  async getApiSequenceLinks(params?: { apiId?: string; sequenceId?: string; projectId?: string }): Promise<ApiResponse<any[]>> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.axios.get(
+      '/api-sequence-links',
+      { params }
+    );
+    return response.data;
+  }
+
+  async createApiSequenceLink(data: { apiId: string; sequenceId: string; description?: string }): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.axios.post(
+      '/api-sequence-links',
+      data
+    );
+    return response.data;
+  }
+
+  // API-DTO 關聯
+  async getApiDtoLinks(params?: { apiId?: string; dtoId?: string; projectId?: string }): Promise<ApiResponse<any[]>> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.axios.get(
+      '/api-dto-links',
+      { params }
+    );
+    return response.data;
+  }
+
+  async createApiDtoLink(data: { apiId: string; dtoId: string; role: 'req' | 'res'; description?: string }): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.axios.post(
+      '/api-dto-links',
+      data
+    );
+    return response.data;
+  }
 }
 
 export default new ApiService();
