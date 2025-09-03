@@ -1,4 +1,5 @@
 import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { ModuleData, UseCaseData, SequenceDiagramData, APIContractData, DTOSchemaData } from '@/types/backend';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
@@ -244,7 +245,7 @@ export interface ProjectCatalog {
 }
 
 class ApiService {
-  private axios = axios.create({
+  public axios = axios.create({
     baseURL: API_BASE_URL,
     headers: {
       'Content-Type': 'application/json',
@@ -465,9 +466,10 @@ class ApiService {
   }
 
   async createAPIContract(data: Partial<APIContract>): Promise<ApiResponse<APIContract>> {
+    const { projectId, ...apiData } = data;
     const response: AxiosResponse<ApiResponse<APIContract>> = await this.axios.post(
-      '/api-contracts',
-      data
+      `/projects/${projectId}/apis`,
+      apiData
     );
     return response.data;
   }
@@ -501,9 +503,10 @@ class ApiService {
   }
 
   async createDTOSchema(data: Partial<DTOSchema>): Promise<ApiResponse<DTOSchema>> {
+    const { projectId, ...dtoData } = data;
     const response: AxiosResponse<ApiResponse<DTOSchema>> = await this.axios.post(
-      '/dto-schemas',
-      data
+      `/projects/${projectId}/dtos`,
+      dtoData
     );
     return response.data;
   }

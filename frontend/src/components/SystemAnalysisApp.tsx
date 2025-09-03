@@ -140,9 +140,10 @@ interface SystemAnalysisAppProps {
   user: { email: string; name: string };
   onBackToProjects: () => void;
   onLogout: () => void;
+  onOpenAIAssistant?: () => void;
 }
 
-export default function SystemAnalysisApp({ projectId, user, onBackToProjects, onLogout }: SystemAnalysisAppProps) {
+export default function SystemAnalysisApp({ projectId, user, onBackToProjects, onLogout, onOpenAIAssistant }: SystemAnalysisAppProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -812,6 +813,17 @@ export default function SystemAnalysisApp({ projectId, user, onBackToProjects, o
                   <span className="font-semibold">專案分析</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {onOpenAIAssistant && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onOpenAIAssistant}
+                      className="flex items-center gap-1"
+                    >
+                      <Bot size={16} />
+                      AI助手
+                    </Button>
+                  )}
                   <span className="text-sm text-gray-600">{user.name}</span>
                   <Button variant="ghost" size="sm" onClick={onLogout}>
                     <LogOut size={16} />

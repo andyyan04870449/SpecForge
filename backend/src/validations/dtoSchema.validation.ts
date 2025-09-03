@@ -30,6 +30,9 @@ const jsonSchemaValidation = Joi.object({
 
 // 建立 DTO Schema
 export const createDtoSchemaSchema = Joi.object({
+  params: Joi.object({
+    projectId: Joi.string().uuid().required(),
+  }).required(),
   body: Joi.object({
     title: Joi.string().min(1).max(200).required(),
     schemaJson: jsonSchemaValidation.required(),

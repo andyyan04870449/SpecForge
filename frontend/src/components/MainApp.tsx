@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import LoginPage from './LoginPage';
 import ProjectListPage from './ProjectListPage';
-import SystemAnalysisApp from './SystemAnalysisApp';
+import AIDesignCanvasV2 from '@/pages/AIDesignCanvasV2';
 import api from '@/services/api';
 
-type AppPage = 'login' | 'projects' | 'analysis';
+type AppPage = 'login' | 'projects' | 'design-canvas';
 
 interface User {
   email: string;
@@ -85,13 +85,14 @@ export default function MainApp() {
 
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
-    setCurrentPage('analysis');
+    setCurrentPage('design-canvas');
   };
 
   const handleBackToProjects = () => {
     setSelectedProjectId(null);
     setCurrentPage('projects');
   };
+
 
   // 顯示載入畫面
   if (isLoading) {
@@ -120,9 +121,9 @@ export default function MainApp() {
     );
   }
 
-  if (currentPage === 'analysis') {
+  if (currentPage === 'design-canvas') {
     return (
-      <SystemAnalysisApp
+      <AIDesignCanvasV2 
         projectId={selectedProjectId!}
         user={user!}
         onBackToProjects={handleBackToProjects}
