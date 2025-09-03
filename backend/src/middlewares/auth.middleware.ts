@@ -23,7 +23,7 @@ declare global {
 /**
  * JWT Token 認證中介軟體
  */
-export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
   
@@ -57,7 +57,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 /**
  * 可選認證中介軟體 - Token 存在時解析，不存在時不報錯
  */
-export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
+export const optionalAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
   

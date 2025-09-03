@@ -62,10 +62,10 @@ interface APIDocData {
 
 interface APIDocViewerProps {
   apiData: APIDocData;
-  onUpdate?: (data: APIDocData) => void;
+  onUpdate?: (data: APIDocData) => Promise<void>;
   onAddItem?: () => void;
   isEditing?: boolean;
-  onSave?: () => void;
+  onSave?: () => Promise<void>;
   onCancel?: () => void;
 }
 
@@ -76,6 +76,7 @@ export default function APIDocViewer({ apiData, onUpdate, onAddItem, isEditing =
   });
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [editData, setEditData] = useState<APIDocData>(apiData);
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({

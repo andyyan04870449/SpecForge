@@ -67,10 +67,10 @@ interface DTOData {
 
 interface DTOViewerProps {
   dtoData: DTOData;
-  onUpdate?: (data: DTOData) => void;
+  onUpdate?: (data: DTOData) => Promise<void>;
   onAddItem?: () => void;
   isEditing?: boolean;
-  onSave?: () => void;
+  onSave?: () => Promise<void>;
   onCancel?: () => void;
 }
 
@@ -84,6 +84,7 @@ export default function DTOViewer({ dtoData, onUpdate, onAddItem, isEditing = fa
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [editData, setEditData] = useState<DTOData>(dtoData);
   const [isAddingProperty, setIsAddingProperty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newProperty, setNewProperty] = useState<DTOProperty>({
     name: '',
     type: 'string',

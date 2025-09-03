@@ -273,8 +273,11 @@ export class DtoSchemaService {
     };
   }> {
     try {
-      const page = Math.max(1, options.page || 1);
-      const limit = Math.min(100, Math.max(1, options.limit || 20));
+      const pageNum = typeof options.page === 'string' ? parseInt(options.page, 10) : options.page;
+      const limitNum = typeof options.limit === 'string' ? parseInt(options.limit, 10) : options.limit;
+      
+      const page = Math.max(1, pageNum || 1);
+      const limit = Math.min(100, Math.max(1, limitNum || 20));
       const skip = (page - 1) * limit;
 
       const where: Prisma.DtoSchemaWhereInput = {};

@@ -2,12 +2,12 @@ import Joi from 'joi';
 
 export const createSequenceSchema = Joi.object({
   title: Joi.string().min(1).max(100).required(),
-  mermaidSrc: Joi.string().min(1).max(10000).required(),
+  mermaidSrc: Joi.string().max(10000).allow('').required(),
 });
 
 export const updateSequenceSchema = Joi.object({
   title: Joi.string().min(1).max(100).optional(),
-  mermaidSrc: Joi.string().min(1).max(10000).optional(),
+  mermaidSrc: Joi.string().max(10000).allow('').optional(),
 }).min(1);
 
 export const sequenceQuerySchema = Joi.object({

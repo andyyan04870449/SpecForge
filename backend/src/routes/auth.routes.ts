@@ -37,7 +37,7 @@ const authService = new AuthService();
  *       201:
  *         description: 註冊成功
  */
-router.post('/register', asyncHandler(async (req: Request, res: Response) => {
+router.post('/register', asyncHandler(async (req: Request, res: Response): Promise<Response | void> => {
   const { email, password, name } = req.body;
   
   if (!email || !password) {
@@ -103,7 +103,7 @@ router.post('/register', asyncHandler(async (req: Request, res: Response) => {
  *       200:
  *         description: 登入成功
  */
-router.post('/login', asyncHandler(async (req: Request, res: Response) => {
+router.post('/login', asyncHandler(async (req: Request, res: Response): Promise<Response | void> => {
   const { email, password } = req.body;
   
   if (!email || !password) {
@@ -155,7 +155,7 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
  *       200:
  *         description: 刷新成功
  */
-router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
+router.post('/refresh', asyncHandler(async (req: Request, res: Response): Promise<Response | void> => {
   const { refreshToken } = req.body;
   
   if (!refreshToken) {
@@ -207,7 +207,7 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
  *       200:
  *         description: 登出成功
  */
-router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
+router.post('/logout', asyncHandler(async (req: Request, res: Response): Promise<Response | void> => {
   const { refreshToken } = req.body;
   
   if (!refreshToken) {
@@ -252,7 +252,7 @@ router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
  *       401:
  *         description: 未認證
  */
-router.get('/profile', asyncHandler(async (req: Request, res: Response) => {
+router.get('/profile', asyncHandler(async (req: Request, res: Response): Promise<Response | void> => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

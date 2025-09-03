@@ -2,7 +2,6 @@
  * 路由索引文件
  */
 
-import { Router } from 'express';
 import projectRoutes from './project.routes';
 import moduleRoutes from './module.routes';
 import useCaseRoutes from './useCase.routes';

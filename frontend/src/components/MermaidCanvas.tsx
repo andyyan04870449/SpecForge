@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
-import { Code, X, AlertTriangle } from 'lucide-react';
+import { Code, X, AlertTriangle, Save, Edit3 } from 'lucide-react';
 import MermaidRenderer from './MermaidRenderer';
 
 interface MermaidCanvasProps {
@@ -14,9 +14,12 @@ interface MermaidCanvasProps {
 }
 
 export default function MermaidCanvas({ initialContent = '', onContentChange, title, isEditing = false }: MermaidCanvasProps) {
-  const [showCodeEditor, setShowCodeEditor] = useState(true); // 預設顯示代碼編輯器
-  const [mermaidCode, setMermaidCode] = useState(initialContent || getDefaultContent());
+  const [showCodeEditor, setShowCodeEditor] = useState(false); // 預設隱藏代碼編輯器
+  const [mermaidCode, setMermaidCode] = useState(initialContent);
   const [error, setError] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   // 提供預設範例
   function getDefaultContent() {
@@ -58,7 +61,24 @@ export default function MermaidCanvas({ initialContent = '', onContentChange, ti
   const handleCodeChange = (newCode: string) => {
     setMermaidCode(newCode);
     setError(null);
-    onContentChange?.(newCode);
+    setHasChanges(true);
+    
+    // 取消之前的保存計時器
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // 如果在編輯模式，設定自動保存（防抖 1 秒）
+    if (isEditing && onContentChange) {
+      setIsSaving(true);
+      saveTimeoutRef.current = setTimeout(async () => {
+        await onContentChange(newCode);
+        setHasChanges(false);
+        setIsSaving(false);
+      }, 1000);
+    } else {
+      onContentChange?.(newCode);
+    }
   };
 
   const handleMermaidError = (errorMsg: string) => {
@@ -80,69 +100,14 @@ export default function MermaidCanvas({ initialContent = '', onContentChange, ti
   }, []);
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* 頂部工具列 */}
-      <div className="absolute top-2 right-2 z-20">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowCodeEditor(!showCodeEditor)}
-          className="bg-background/80 backdrop-blur-sm"
-          title={showCodeEditor ? "隱藏代碼編輯器" : "顯示代碼編輯器"}
-        >
-          {showCodeEditor ? (
-            <>
-              <X className="w-4 h-4 mr-1" />
-              隱藏代碼
-            </>
-          ) : (
-            <>
-              <Code className="w-4 h-4 mr-1" />
-              顯示代碼
-            </>
-          )}
-        </Button>
-      </div>
+    <div className="h-full w-full flex flex-col relative">
 
       {/* 主要內容區域 - 充滿整個可用空間 */}
       {showCodeEditor ? (
         <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-          {/* Mermaid 畫布 */}
-          <ResizablePanel defaultSize={65} minSize={30}>
-            <div className="h-full w-full flex flex-col">
-              {mermaidCode.trim() ? (
-                <MermaidRenderer
-                  chart={mermaidCode}
-                  className="h-full w-full"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>請在右側輸入 Mermaid 代碼</p>
-                  </div>
-                </div>
-              )}
-              
-              {/* 錯誤訊息 */}
-              {error && (
-                <div className="p-4 border-t">
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      {error}
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle />
-
-          {/* 代碼編輯器 */}
-          <ResizablePanel defaultSize={35} minSize={20} maxSize={70}>
-            <div className="h-full flex flex-col border-l bg-muted/30">
+          {/* 代碼編輯器 - 移到左側 */}
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={50}>
+            <div className="h-full flex flex-col border-r bg-muted/30">
               <div className="p-3 border-b">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">Mermaid 代碼</h3>
@@ -181,10 +146,145 @@ B-->>A: Hello Alice`}
               )}
             </div>
           </ResizablePanel>
+
+          <ResizableHandle />
+
+          {/* Mermaid 畫布 - 移到右側 */}
+          <ResizablePanel defaultSize={80} minSize={50}>
+            <div className="h-full w-full flex flex-col relative">
+              {/* 左上角工具列 - 在畫布內部 */}
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
+                {/* 編輯狀態指示器 */}
+                {isEditing && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-md shadow-sm border">
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                        <span className="text-xs text-gray-600">儲存中...</span>
+                      </>
+                    ) : hasChanges ? (
+                      <>
+                        <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-xs text-gray-600">未儲存</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-3 w-3 text-green-600" />
+                        <span className="text-xs text-gray-600">已儲存</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCodeEditor(!showCodeEditor)}
+                  className="bg-background/80 backdrop-blur-sm"
+                  title={showCodeEditor ? "隱藏代碼編輯器" : "顯示代碼編輯器"}
+                >
+                  {showCodeEditor ? (
+                    <>
+                      <X className="w-4 h-4 mr-1" />
+                      隱藏代碼
+                    </>
+                  ) : (
+                    <>
+                      <Code className="w-4 h-4 mr-1" />
+                      顯示代碼
+                    </>
+                  )}
+                </Button>
+              </div>
+              {mermaidCode.trim() ? (
+                <MermaidRenderer
+                  chart={mermaidCode}
+                  className="h-full w-full"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="mb-4">請在左側輸入 Mermaid 代碼</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const exampleCode = getDefaultContent();
+                        setMermaidCode(exampleCode);
+                        setHasChanges(true);
+                        if (onContentChange) {
+                          onContentChange(exampleCode);
+                        }
+                      }}
+                    >
+                      使用範例代碼
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* 錯誤訊息 */}
+              {error && (
+                <div className="p-4 border-t">
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      {error}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </div>
+          </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
         // 全螢幕 Mermaid 畫布
-        <div className="h-full w-full flex flex-col">
+        <div className="h-full w-full flex flex-col relative">
+          {/* 左上角工具列 - 在畫布內部 */}
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
+            {/* 編輯狀態指示器 */}
+            {isEditing && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-md shadow-sm border">
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                    <span className="text-xs text-gray-600">儲存中...</span>
+                  </>
+                ) : hasChanges ? (
+                  <>
+                    <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>
+                    <span className="text-xs text-gray-600">未儲存</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3 w-3 text-green-600" />
+                    <span className="text-xs text-gray-600">已儲存</span>
+                  </>
+                )}
+              </div>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCodeEditor(!showCodeEditor)}
+              className="bg-background/80 backdrop-blur-sm"
+              title={showCodeEditor ? "隱藏代碼編輯器" : "顯示代碼編輯器"}
+            >
+              {showCodeEditor ? (
+                <>
+                  <X className="w-4 h-4 mr-1" />
+                  隱藏代碼
+                </>
+              ) : (
+                <>
+                  <Code className="w-4 h-4 mr-1" />
+                  顯示代碼
+                </>
+              )}
+            </Button>
+          </div>
           {mermaidCode.trim() ? (
             <MermaidRenderer
               chart={mermaidCode}
@@ -194,7 +294,21 @@ B-->>A: Hello Alice`}
             <div className="h-full flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>點擊右上角代碼圖標開始編輯</p>
+                <p className="mb-4">點擊左上角代碼圖標開始編輯</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const exampleCode = getDefaultContent();
+                    setMermaidCode(exampleCode);
+                    setHasChanges(true);
+                    if (onContentChange) {
+                      onContentChange(exampleCode);
+                    }
+                  }}
+                >
+                  使用範例代碼
+                </Button>
               </div>
             </div>
           )}

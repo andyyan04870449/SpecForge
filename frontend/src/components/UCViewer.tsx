@@ -44,20 +44,31 @@ interface UCData {
 
 interface UCViewerProps {
   ucData: UCData;
-  onUpdate?: (updatedData: UCData) => void;
+  onUpdate?: (updatedData: UCData) => Promise<void>;
   onAddItem?: () => void;
   isEditing?: boolean;
-  onSave?: () => void;
+  onSave?: () => Promise<void>;
   onCancel?: () => void;
 }
 
 export default function UCViewer({ ucData, onUpdate, onAddItem, isEditing = false, onSave, onCancel }: UCViewerProps) {
   const [editData, setEditData] = useState<UCData>(ucData);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    onUpdate?.(editData);
-    if (onSave) {
-      onSave();
+  const handleSave = async () => {
+    if (!onUpdate) return;
+    
+    setIsSaving(true);
+    try {
+      await onUpdate(editData);
+      if (onSave) {
+        await onSave();
+      }
+    } catch (error) {
+      console.error('保存失敗:', error);
+      alert('保存失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
     }
   };
 

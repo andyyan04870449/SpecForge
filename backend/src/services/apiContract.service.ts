@@ -145,7 +145,11 @@ export class ApiContractService {
       sortOrder = 'asc',
     } = params;
 
-    const skip = (page - 1) * limit;
+    // 確保 page 和 limit 是數字
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
+    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
+    
+    const skip = (pageNum - 1) * limitNum;
     
     const where: Prisma.ApiContractWhereInput = {};
     
@@ -174,7 +178,7 @@ export class ApiContractService {
       this.prisma.apiContract.findMany({
         where,
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: { [sortBy]: sortOrder },
         include: {
           project: true,
@@ -192,8 +196,8 @@ export class ApiContractService {
     return {
       data,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
     };
   }
 

@@ -20,7 +20,7 @@ const router = Router();
  * @access  Public
  */
 router.get(
-  '/',
+  '/use-cases',
   validate(useCaseQuerySchema, 'query'),
   useCaseController.findAll
 );

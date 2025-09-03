@@ -114,7 +114,7 @@ export const checkProjectPermission = (requiredRole: ProjectRole = 'VIEWER') => 
       }
       
       // 檢查角色權限
-      const userRoleLevel = ROLE_HIERARCHY[member.role];
+      const userRoleLevel = ROLE_HIERARCHY[member.role as ProjectRole];
       const requiredLevel = ROLE_HIERARCHY[requiredRole];
       
       if (userRoleLevel < requiredLevel) {
@@ -133,7 +133,7 @@ export const checkProjectPermission = (requiredRole: ProjectRole = 'VIEWER') => 
         id: member.id,
         projectId: member.projectId,
         userId: member.userId,
-        role: member.role,
+        role: member.role as 'OWNER' | 'EDITOR' | 'VIEWER',
         permissions: member.permissions
       };
       
@@ -155,7 +155,7 @@ export const checkProjectPermission = (requiredRole: ProjectRole = 'VIEWER') => 
 /**
  * 檢查專案所有權（只有擁有者才能執行的操作）
  */
-export const checkProjectOwnership = async (req: Request, res: Response, next: NextFunction) => {
+export const checkProjectOwnership = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
   if (!req.user) {
     return res.status(401).json({
       success: false,

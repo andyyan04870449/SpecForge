@@ -78,8 +78,8 @@ export class StatisticsService {
       if (!project) {
         throw new AppError(
           404,
-          `Project with ID ${projectId} not found`,
-          ErrorCode.BIZ_NOT_FOUND
+          ErrorCode.BIZ_NOT_FOUND,
+          `Project with ID ${projectId} not found`
         );
       }
 

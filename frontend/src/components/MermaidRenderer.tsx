@@ -139,6 +139,8 @@ export default function MermaidRenderer({ chart, className = '' }: MermaidRender
         wheel={{ step: 0.15 }}
         doubleClick={{ disabled: false, step: 0.75 }}
         panning={{ velocityDisabled: false }}
+        limitToBounds={false}
+        centerZoomedOut={false}
       >
         {({ zoomIn, zoomOut, resetTransform, centerView }) => (
           <>

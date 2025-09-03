@@ -152,8 +152,8 @@ export class AiGeneratorService {
       } else {
         throw new AppError(
           400,
-          'Either functionality or endpoints must be provided',
-          ErrorCode.VAL_INVALID_INPUT
+          ErrorCode.VAL_INVALID_INPUT,
+          'Either functionality or endpoints must be provided'
         );
       }
 
@@ -486,7 +486,7 @@ export class AiGeneratorService {
    */
   private generateMockSequenceDiagram(
     title: string,
-    description?: string,
+    _description?: string,
     actors: string[] = ['User', 'System']
   ): string {
     const templates = [

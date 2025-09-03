@@ -212,6 +212,16 @@ export interface DTOSchema {
   updatedAt: string;
 }
 
+// 模組相關
+export interface Module {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 專案目錄相關
 export interface ProjectCatalog {
   modules: {
@@ -351,11 +361,11 @@ class ApiService {
   // ========== 專案分析相關 API ==========
   
   // UC (使用案例) API
-  async getUseCases(projectId: string): Promise<ApiResponse<UseCase[]>> {
+  async getUseCases(projectId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<UseCase[]>> {
     // 使用搜尋 API 來獲取專案的所有 UC
     const response: AxiosResponse<ApiResponse<UseCase[]>> = await this.axios.get(
       '/use-cases',
-      { params: { projectId } }
+      { params: { projectId, ...params } }
     );
     return response.data;
   }
@@ -395,10 +405,10 @@ class ApiService {
   }
 
   // SD (循序圖) API
-  async getSequenceDiagrams(projectId: string): Promise<ApiResponse<SequenceDiagram[]>> {
+  async getSequenceDiagrams(projectId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<SequenceDiagram[]>> {
     const response: AxiosResponse<ApiResponse<SequenceDiagram[]>> = await this.axios.get(
       '/sequences',
-      { params: { projectId } }
+      { params: { projectId, ...params } }
     );
     return response.data;
   }
@@ -418,6 +428,14 @@ class ApiService {
     return response.data;
   }
 
+  async createSequenceDiagramForUseCase(useCaseId: string, data: Partial<SequenceDiagram>): Promise<ApiResponse<SequenceDiagram>> {
+    const response: AxiosResponse<ApiResponse<SequenceDiagram>> = await this.axios.post(
+      `/use-cases/${useCaseId}/sequences`,
+      data
+    );
+    return response.data;
+  }
+
   async updateSequenceDiagram(sdId: string, data: Partial<SequenceDiagram>): Promise<ApiResponse<SequenceDiagram>> {
     const response: AxiosResponse<ApiResponse<SequenceDiagram>> = await this.axios.put(
       `/sequences/${sdId}`,
@@ -431,10 +449,10 @@ class ApiService {
   }
 
   // API 合約 API
-  async getAPIContracts(projectId: string): Promise<ApiResponse<APIContract[]>> {
+  async getAPIContracts(projectId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<APIContract[]>> {
     const response: AxiosResponse<ApiResponse<APIContract[]>> = await this.axios.get(
       '/api-contracts',
-      { params: { projectId } }
+      { params: { projectId, ...params } }
     );
     return response.data;
   }
@@ -467,10 +485,10 @@ class ApiService {
   }
 
   // DTO Schema API
-  async getDTOSchemas(projectId: string): Promise<ApiResponse<DTOSchema[]>> {
+  async getDTOSchemas(projectId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<DTOSchema[]>> {
     const response: AxiosResponse<ApiResponse<DTOSchema[]>> = await this.axios.get(
       '/dto-schemas',
-      { params: { projectId } }
+      { params: { projectId, ...params } }
     );
     return response.data;
   }
@@ -508,6 +526,41 @@ class ApiService {
       `/catalog/projects/${projectId}`
     );
     return response.data;
+  }
+
+  // 模組 API
+  async getModules(projectId: string): Promise<ApiResponse<Module[]>> {
+    const response: AxiosResponse<ApiResponse<Module[]>> = await this.axios.get(
+      `/projects/${projectId}/modules`
+    );
+    return response.data;
+  }
+
+  async getModule(moduleId: string): Promise<ApiResponse<Module>> {
+    const response: AxiosResponse<ApiResponse<Module>> = await this.axios.get(
+      `/modules/${moduleId}`
+    );
+    return response.data;
+  }
+
+  async createModule(projectId: string, data: Partial<Module>): Promise<ApiResponse<Module>> {
+    const response: AxiosResponse<ApiResponse<Module>> = await this.axios.post(
+      `/projects/${projectId}/modules`,
+      data
+    );
+    return response.data;
+  }
+
+  async updateModule(moduleId: string, data: Partial<Module>): Promise<ApiResponse<Module>> {
+    const response: AxiosResponse<ApiResponse<Module>> = await this.axios.put(
+      `/modules/${moduleId}`,
+      data
+    );
+    return response.data;
+  }
+
+  async deleteModule(moduleId: string): Promise<void> {
+    await this.axios.delete(`/modules/${moduleId}`);
   }
 }
 

@@ -3,7 +3,6 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { AppError, ErrorCode } from '../types/errors';
 import { ExportData } from './export.service';
 import { CodeGeneratorService } from './codeGenerator.service';
 import winston from 'winston';

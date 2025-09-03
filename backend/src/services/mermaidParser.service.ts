@@ -25,6 +25,15 @@ export class MermaidParserService {
    */
   static parse(mermaidSource: string): ParseResult {
     try {
+      // 處理空內容
+      if (!mermaidSource || mermaidSource.trim().length === 0) {
+        return {
+          success: true,
+          participants: [],
+          apiCalls: [],
+        };
+      }
+
       const lines = mermaidSource.split('\n').map(line => line.trim());
       const participants = new Set<string>();
       const apiCalls: ParsedApiCall[] = [];
@@ -172,8 +181,9 @@ export class MermaidParserService {
    * 驗證 Mermaid 語法基本結構
    */
   static validate(mermaidSource: string): { valid: boolean; error?: string } {
+    // 空內容被視為有效，狀態為pending
     if (!mermaidSource || mermaidSource.trim().length === 0) {
-      return { valid: false, error: 'Mermaid source is empty' };
+      return { valid: true };
     }
 
     const lines = mermaidSource.split('\n').map(line => line.trim());

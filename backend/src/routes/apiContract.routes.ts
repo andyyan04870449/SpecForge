@@ -14,12 +14,12 @@ import {
 const router = Router();
 
 /**
- * @route   GET /api/v1/apis
+ * @route   GET /api/v1/api-contracts
  * @desc    取得所有 API 合約列表
  * @access  Public
  */
 router.get(
-  '/',
+  '/api-contracts',
   validate(apiContractQuerySchema, 'query'),
   apiContractController.findAll
 );

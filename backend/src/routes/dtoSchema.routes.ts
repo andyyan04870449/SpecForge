@@ -18,6 +18,13 @@ import {
 const router = Router();
 const dtoSchemaController = new DtoSchemaController();
 
+// 查詢所有 DTO Schemas
+router.get(
+  '/dto-schemas',
+  validate(listDtoSchemasSchema),
+  dtoSchemaController.findMany
+);
+
 // Project 相關路由 - /projects/:projectId/dtos
 router.post(
   '/projects/:projectId/dtos',

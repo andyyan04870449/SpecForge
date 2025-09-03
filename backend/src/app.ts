@@ -93,11 +93,11 @@ app.use(`${apiPrefix}/auth`, authRoutes);
 
 // 業務路由
 app.use(`${apiPrefix}/projects`, projectRoutes);
-app.use(`${apiPrefix}`, moduleRoutes); // Module routes 包含 /projects/:id/modules 和 /modules/:id 路徑
-app.use(`${apiPrefix}`, useCaseRoutes); // UseCase routes 包含 /modules/:id/use-cases 和 /use-cases/:id 路徑
-app.use(`${apiPrefix}`, sequenceRoutes); // Sequence routes 包含 /use-cases/:id/sequences 和 /sequences/:id 路徑
-app.use(`${apiPrefix}`, apiRoutes); // API Contract routes 包含 /projects/:id/apis 和 /apis/:id 路徑
-app.use(`${apiPrefix}`, dtoRoutes); // DTO routes 包含 /projects/:id/dtos 和 /dtos/:id 路徑
+app.use(`${apiPrefix}`, moduleRoutes); // 包含 /projects/:id/modules 和 /modules/:id
+app.use(`${apiPrefix}`, useCaseRoutes); // 包含 /modules/:id/use-cases 和 /use-cases/:id
+app.use(`${apiPrefix}`, sequenceRoutes); // 包含 /sequences
+app.use(`${apiPrefix}`, apiRoutes); // 包含 /api-contracts
+app.use(`${apiPrefix}`, dtoRoutes); // 包含 /dto-schemas
 app.use(`${apiPrefix}/api-sequence-links`, linkRoutes.apiSequenceRouter);
 app.use(`${apiPrefix}/api-dto-links`, linkRoutes.apiDtoRouter);
 app.use(`${apiPrefix}/catalog`, catalogRoutes);
